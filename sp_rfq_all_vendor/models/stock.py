@@ -69,17 +69,17 @@ class MultiVendorStockRule(models.Model):
 						# vals['partner_id'] = supplier[0].partner_id.id
 					po = self.env['purchase.order'].with_company(company_id).with_user(SUPERUSER_ID).create(vals)
 			else:
-                reference_ids = set()
-                for procurement in procurements:
-                    reference_ids |= set(procurement.values.get('reference_ids', self.env['stock.reference']).ids)
-                # If a purchase order is found, adapt its `origin` field.
-                po.reference_ids = [Command.link(ref_id) for ref_id in reference_ids]
-                if po.origin:
-                    missing_origins = origins - set(po.origin.split(', '))
-                    if missing_origins:
-                        po.write({'origin': po.origin + ', ' + ', '.join(missing_origins)})
-                else:
-                    po.write({'origin': ', '.join(origins)})
+				reference_ids = set()
+				for procurement in procurements:
+					reference_ids |= set(procurement.values.get('reference_ids', self.env['stock.reference']).ids)
+				# If a purchase order is found, adapt its `origin` field.
+				po.reference_ids = [Command.link(ref_id) for ref_id in reference_ids]
+				if po.origin:
+					missing_origins = origins - set(po.origin.split(', '))
+					if missing_origins:
+						po.write({'origin': po.origin + ', ' + ', '.join(missing_origins)})
+				else:
+					po.write({'origin': ', '.join(origins)})
 
 			# procurements_to_merge = self._get_procurements_to_merge(procurements)
 			# procurements = self._merge_procurements(procurements_to_merge)
