@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_credit_request,access_credit_request,model_credit_request,,1,1,1,1
+access_credit_limit_increase,access_credit_limit_increase,model_credit_limit_increase,,1,1,1,1

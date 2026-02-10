@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+	<data>
+		
+		<record id="action_advance_payment_receivable" model="ir.actions.act_window">
+			<field name="name">Customer Advance Payments</field>
+			<field name="res_model">account.payment</field>
+			<field name="view_mode">list,kanban,form,graph,activity</field>
+			<field name="context">{
+				'default_payment_type': 'inbound',
+				'default_partner_type': 'customer',
+				'search_default_inbound_filter': 1,
+				'default_move_journal_types': ('bank', 'cash'),
+				'display_account_trust': True,
+			}</field>
+			<field name="view_id" ref="account.view_account_payment_tree"/>
+			<field name="help" type="html">
+				<p class="o_view_nocontent_smiling_face">
+				  Register a payment
+				</p><p>
+				  Payments are used to register liquidity movements. You can process those payments by your own means or by using installed facilities.
+				</p>
+			</field>
+		</record>
+
+		<record id="action_advance_payments_payable" model="ir.actions.act_window">
+			<field name="name">Vendor Advance Payments</field>
+			<field name="res_model">account.payment</field>
+			<field name="view_mode">list,kanban,form,graph,activity</field>
+			<field name="context">{
+				'default_payment_type': 'outbound',
+				'default_partner_type': 'supplier',
+				'search_default_outbound_filter': 1,
+				'default_move_journal_types': ('bank', 'cash'),
+				'display_account_trust': True,
+			}</field>
+			<field name="view_id" ref="account.view_account_supplier_payment_tree"/>
+			<field name="help" type="html">
+				<p class="o_view_nocontent_smiling_face">
+				  Register a payment
+				</p><p>
+				  Payments are used to register liquidity movements. You can process those payments by your own means or by using installed facilities.
+				</p>
+			</field>
+		</record>
+
+		<menuitem id="menu_advance_payment" name="Advance Payment" web_icon="sp_sales_approval,static/img/icon.png" groups="sales_team.group_sale_salesman"/>
+		<menuitem id="submenu_advance_payment" name="Customer Advance Payment" action="action_advance_payment_receivable" parent="sp_sales_approval.menu_advance_payment" sequence="1"/>
+		<menuitem id="submenu_vendor_advance_payment" name="Vendor Advance Payment" action="action_advance_payments_payable" parent="sp_sales_approval.menu_advance_payment" sequence="2"/>
+
+	</data>
+</odoo>

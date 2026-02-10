@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+	<template id="sale_report_saleorder_document" inherit_id="sale.report_saleorder_document">
+		<xpath expr="//th[@name='th_discount']" position="replace">
+		</xpath>
+		<xpath expr="//td[@t-if='display_discount']" position="replace">
+		</xpath>
+	</template>
+
+	<template id="account_report_invoice_document" inherit_id="account.report_invoice_document">
+		<xpath expr="//th[@name='th_discount']" position="replace">
+		</xpath>
+		<xpath expr="//td[@name='td_discount']" position="replace">
+		</xpath>
+	</template>
+
+</odoo>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<data>
+	
+		<record id="sale_view_order_form_inherit" model="ir.ui.view">
+			<field name="name">sale.order.form.inherit</field>
+			<field name="model">sale.order</field>
+			<field name="inherit_id" ref="sale.view_order_form"/>
+			<field name="arch" type="xml">
+				<xpath expr="//field[@name='order_line']//list//field[@name='name']" position="after">
+					<field name="is_hilti" column_invisible="1"/>
+					<field name="pf_gst_per" readonly="is_hilti == False"/>
+				</xpath>
+				<xpath expr="//field[@name='order_line']//list//field[@name='price_subtotal']" position="before">
+					<field name="pf_gst_amount" readonly="is_hilti == False"/>
+				</xpath>
+			</field>
+		</record>
+	
+	</data>
+</odoo>

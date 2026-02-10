@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+	<data>
+
+		<record id="group_cash_request_approval" model="res.groups">
+			<field name="name">Petty Cash Request Approval</field>
+		</record>
+
+	</data>
+</odoo>

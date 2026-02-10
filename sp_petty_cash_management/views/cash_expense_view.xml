@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<data>
+		
+		<!-- explicit list view definition -->
+		<record model="ir.ui.view" id="petty_cash_expense_list">
+			<field name="name">petty cash expense list</field>
+			<field name="model">petty.cash.expense</field>
+			<field name="arch" type="xml">
+				<list default_order="name desc">
+					<field name="name"/>
+					<field name="date"/>
+					<field name="account_id"/>
+					<field name="analytic_distribution" widget="analytic_distribution"/>
+					<field name="expense_amount"/>
+					<field name="currency_id"/>
+					<field name="state"/>
+					<field name="user_id"/>
+				</list>
+			</field>
+		</record>
+
+		<!-- explicit form view definition -->
+		<record model="ir.ui.view" id="petty_cash_expense_form">
+			<field name="name">petty cash expense form</field>
+			<field name="model">petty.cash.expense</field>
+			<field name="arch" type="xml">
+				<form>
+					<header>
+						<button name="action_confirm" invisible="state != 'draft'" type="object" class="btn-primary" string="Confirm" />
+						<button name="action_reconcile_payment" type="object" invisible="state not in ('confirm')" class="btn-secondry" string="Done" />
+						<button name="action_cancel" type="object" invisible="state not in ('confirm','confirm')" class="btn-secondry" string="Cancel" />
+						<field name="state" widget="statusbar" statusbar_visible="draft,confirm,confirm,done" nolabel="1" readonly="1" />
+					</header>
+					<sheet>
+						<div name="button_box" class="oe_button_box">
+							<button name="action_open_payment" class="oe_stat_button" icon="fa-money" type="object" invisible="state != 'done'" string="1 Payment" />
+						</div>
+						<div class="oe_title">
+							<h1>
+								<field name="name" readonly="1" />
+							</h1>
+						</div>
+						<group>
+							<group>
+								<field name="account_id" required="1" options="{'no_open': True, 'no_create': True}" readonly="state != 'draft'" />
+								<field name="payment_journal_id" required="1" options="{'no_open': True, 'no_create': True}" readonly="state != 'draft'" />
+								<field name="cash_journal_id" options="{'no_open': True, 'no_create': True}" readonly="state != 'draft'" invisible="1" />
+								<field name="payment_id" required="1" invisible="1" options="{'no_open': True, 'no_create': True}" readonly="state != 'draft'" />
+							</group>
+							<group>
+								<field name="date" readonly="state != 'draft'" />
+								<field name="user_id" readonly="state != 'draft'" options="{'no_open': True, 'no_create': True}" />
+								<field name="company_id" readonly="1" options="{'no_open': True, 'no_create': True}" />
+								<field name="analytic_distribution" options="{'no_open': True, 'no_create': True}" readonly="state != 'draft'" widget="analytic_distribution"/>
+							</group>
+						</group>
+						<notebook>
+							<page string="Expense Lines">
+								<field name="expense_line_ids" readonly="state != 'draft'">
+									<list editable="bottom">
+										<field name="account_id" string="Exp. Account" required="1"/>
+										<field name="perticular" string="Narretion" />
+										<field name="amount" />
+									</list>
+								</field>
+								<group name="note_group" col="6" class="mt-2 mt-md-0">
+									<group colspan="4" />
+									<group class="oe_subtotal_footer oe_right" colspan="2" name="total">
+										<field name="expense_amount" readonly="1" />
+									</group>
+									<div class="clearfix" />
+								</group>
+							</page>
+						</notebook>
+					</sheet>
+					<chatter />
+				</form>
+			</field>
+		</record>
+
+		<!-- actions opening views on models -->
+		<record model="ir.actions.act_window" id="petty_cash_expense_action_window">
+			<field name="name">Cash Expense</field>
+			<field name="res_model">petty.cash.expense</field>
+			<field name="view_mode">list,form</field>
+			<field name="view_id" ref="petty_cash_expense_list"/>
+		</record>
+
+	</data>
+</odoo>

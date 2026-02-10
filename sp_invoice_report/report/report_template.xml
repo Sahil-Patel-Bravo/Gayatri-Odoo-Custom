@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+	<template id="account_report_invoice_document" inherit_id="account.report_invoice_document">
+		<xpath expr="//div[@id='informations']" position="after">
+			<div id="other_info" class="row mb-4" t-if="o.move_type == 'out_invoice'">
+				<div class="col">
+					<strong>PO NO</strong>
+					<div t-field="o.po_no"/>
+				</div>
+				<div class="col">
+					<strong>PO Date</strong>
+					<div t-field="o.po_date"/>
+				</div>
+				<div class="col">
+					<strong>Transport</strong>
+					<div t-field="o.transport"/>
+				</div>
+				<div class="col">
+					<strong>LR NO</strong>
+					<div t-field="o.lr_no"/>
+				</div>
+				<div class="col">
+					<strong>LR Date</strong>
+					<div t-field="o.lr_date"/>
+				</div>
+			</div>
+		</xpath>
+		<xpath expr="//div[@name='shipping_address_block']" position="replace">
+        	<div groups="account.group_delivery_invoice_address" name="shipping_address_block">			
+				<strong t-if="o.partner_shipping_id == o.partner_id" class="d-block mt-3">Customer And Invoicing Address</strong>
+				<strong class="d-block mt-3" t-else="">Shipping Address</strong>
+				<div t-field="o.partner_shipping_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
+			</div>
+		</xpath>
+<!-- 		<xpath expr="//div[hasclass('row')]/div[hasclass('col-6')][1]/p" position="inside">
+			GSTIN : <span t-field="o.partner_shipping_id.vat"/>
+		</xpath>
+		<xpath expr="//div[hasclass('row')]/div[hasclass('col-6')][2]//t[1]" position="before">
+			<strong>Shipping Address</strong><br/>
+		</xpath> -->
+	</template>
+
+	<template id="l10n_in_l10n_in_report_invoice_document_inherit" inherit_id="l10n_in.l10n_in_report_invoice_document_inherit">
+		<xpath expr="//div[@name='address_not_same_as_shipping']//t[@t-set='address']" position="replace">
+			<t t-set="address"/>
+		</xpath>
+		<xpath expr="//div[@name='address_same_as_shipping']//t[@t-set='address']" position="replace">
+			<t t-set="address"/>
+		</xpath>
+		<xpath expr="//div[@name='no_shipping']//t[@t-set='address']" position="replace">
+			<t t-set="address"/>
+		</xpath>
+	</template>
+
+</odoo>

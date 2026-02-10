@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<data>
+		
+		<menuitem name="Petty Cash" id="petty_cash_menu_root" groups="account.group_account_invoice" />
+		
+		<menuitem name="Cash Request" 
+			id="petty_cash_request" 
+			parent="sp_petty_cash_management.petty_cash_menu_root" 
+			action="sp_petty_cash_management.petty_cash_request_action_window" />
+		
+		<menuitem name="Cash Expense" 
+			id="petty_cash_expense" 
+			parent="sp_petty_cash_management.petty_cash_menu_root" 
+			action="sp_petty_cash_management.petty_cash_expense_action_window" />
+	 
+	</data>
+</odoo>

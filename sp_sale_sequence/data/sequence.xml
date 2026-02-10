@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<data>
+	
+		<record id="seq_quotation_order" model="ir.sequence">
+			<field name="name">QUOTATION Order</field>
+			<field name="code">quotation.order</field>
+			<field name="prefix">QUOTATION/</field>
+			<field name="padding">5</field>
+			<field name="company_id" eval="False"/>
+		</record>
+	
+	</data>
+</odoo>

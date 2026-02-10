@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+	<record id="seq_sale_request" model="ir.sequence">
+		<field name="name">Sales Approval Request</field>
+		<field name="code">credit.request.seq</field>
+		<field name="prefix">SALES/REQ/</field>
+		<field name="padding">5</field>
+		<field name="company_id" eval="False"/>
+	</record>
+
+	<record id="seq_credit_limit_request" model="ir.sequence">
+		<field name="name">Credit Limit Request</field>
+		<field name="code">credit.limit.request.seq</field>
+		<field name="prefix">CREDIT/REQ/</field>
+		<field name="padding">5</field>
+		<field name="company_id" eval="False"/>
+	</record>
+
+</odoo>

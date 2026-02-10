@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<data>
+		<record id="quick_create_opportunity_form_inherit" model="ir.ui.view">
+			<field name="name">crm.lead.quick_create.inherit</field>
+			<field name="model">crm.lead</field>
+			<field name="inherit_id" ref="crm.quick_create_opportunity_form" />
+			<field name="arch" type="xml">
+				<xpath expr="//field[@name='email_from']" position="attributes">
+					<attribute name="required">0</attribute>
+				</xpath>
+				<xpath expr="//field[@name='partner_id']" position="attributes">
+					<attribute name="string">Customer</attribute>
+				</xpath>
+			</field>
+		</record>
+		<record id="crm_crm_lead_view_form_inherit" model="ir.ui.view">
+			<field name="name">crm.lead.form.inherit</field>
+			<field name="model">crm.lead</field>
+			<field name="inherit_id" ref="crm.crm_lead_view_form" />
+			<field name="arch" type="xml">
+				<xpath expr="//field[@name='tag_ids']" position="after">
+					<field name="state_zip_dict" invisible="1" />
+					<field name="state_dict" invisible="1" />
+				</xpath>
+				<xpath expr="//field[@name='user_id'][1]" position="before">
+					<field name="create_date" />
+					<field name="product_name" required="1" invisible="1"/>
+					<field name="product_ids" widget="many2many_tags" required="1"/>
+					<field name="product_code" required="1"/>
+					<field name="product_qty" required="1"/>
+					<field name="followup_date" widget="date" string="Follow-up Date" required="1"/>
+				</xpath>
+				<xpath expr="//page[@name='lead']/group[1]/group[2]/field[@name='website']" position="before">
+					<field name="vat" />
+				</xpath>
+				<!-- <xpath
+				 expr="//page[@name='lead']/group[1]/group[2]//field[@name='contact_name']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath> -->
+				<!-- <xpath expr="//page[@name='lead']/group[1]/group[2]//field[@name='mobile']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath> -->
+				<xpath expr="//page[@name='lead']/group[1]/group[3]//field[@name='source_id']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath>
+				<!-- <xpath expr="//page[@name='lead']/group[1]/group[1]//field[@name='street']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath>
+				<xpath expr="//page[@name='lead']/group[1]/group[1]//field[@name='street2']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath>
+				<xpath expr="//page[@name='lead']/group[1]/group[1]//field[@name='city']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath>
+				<xpath expr="//page[@name='lead']/group[1]/group[1]//field[@name='state_id']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath>
+				<xpath expr="//page[@name='lead']/group[1]/group[1]//field[@name='zip']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath>
+				<xpath expr="//page[@name='lead']/group[1]/group[1]//field[@name='country_id']" position="attributes">
+					<attribute name="required">1</attribute>
+				</xpath> -->
+			</field>
+		</record>
+
+		<record id="action_update_state_and_country_data" model="ir.actions.server">
+			<field name="name">Update State And Country Search Data</field>
+			<field name="model_id" ref="crm.model_crm_lead"/>
+			<field name="binding_model_id" ref="crm.model_crm_lead"/>
+			<field name="state">code</field>
+			<field name="binding_view_types">list</field>
+			<field name="code">
+				result = records.onchange_on_state_zip_dict()
+			</field>
+		</record>
+
+	</data>
+</odoo>

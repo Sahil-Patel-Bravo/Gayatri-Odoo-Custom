@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<data>
+		   
+		<record id="sale_history_tree" model="ir.ui.view">
+			<field name="name">sale.history.list</field>
+			<field name="model">sale.order.line</field>
+			<field name="arch" type="xml">
+				<list string="Sales Order Lines" create="false">
+					<field name="order_id"/>
+					<field name="order_partner_id"/>
+					<field name="name"/>
+					<field name="salesman_id"/>
+					<field name="price_unit"/>
+					<field name="product_uom_qty" string="Qty"/>
+					<field name="qty_delivered"/>
+					<field name="qty_invoiced"/>
+					<field name="qty_to_invoice"/>
+					<field name="product_uom_id" string="Unit of Measure" groups="uom.group_uom"/>
+					<field name="price_subtotal" sum="Total" widget="monetary"/>
+					<field name="currency_id" column_invisible="True"/>
+				</list>
+			</field>
+		</record>
+
+		<record id="action_sale_history" model="ir.actions.act_window">
+			<field name="res_model">sale.order.line</field>
+			<field name="view_mode">list,pivot,graph</field>
+			<field name="view_id" ref="sp_last_sale_price_history.sale_history_tree"/>
+			<field name="context">{
+					'search_default_sale_state': 1,
+					'search_default_order_date_last_year': 1,
+					'search_default_groupby_supplier': 1,
+			}</field>
+			<field name="help" type="html">
+				<p class="o_view_nocontent_smiling_face">
+					No sale order were made for this product yet!
+				</p>
+			</field>
+		</record>
+
+		<record id="sale_view_order_form_inherit" model="ir.ui.view">
+			<field name="name">sale.order.form.inherit</field>
+			<field name="model">sale.order</field>
+			<field name="inherit_id" ref="sale.view_order_form"/>
+			<field name="arch" type="xml">
+				<xpath expr="//field[@name='order_line']/list" position="inside">
+					<button name="action_sale_history" type="object" icon="fa-history" title="Sales History" invisible="not id"/>
+				</xpath>
+			</field>
+		</record>
+
+	</data>
+</odoo>

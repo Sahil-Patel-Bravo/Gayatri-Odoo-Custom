@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<template id="account_document_tax_totals_template_inherit" inherit_id="account.document_tax_totals_template">
+		<xpath expr="//tr[hasclass('o_subtotal')]" position="after">
+			<tr class="o_subtotal" t-if="pf_amount">
+				<td>
+					<span t-out="pf_name"></span>
+				</td>
+				<td class="text-end">
+					<span t-att-class="oe_subtotal_footer_separator" t-out="pf_amount" t-options="{&quot;widget&quot;: &quot;monetary&quot;, &quot;display_currency&quot;: currency}"></span>
+				</td>
+			</tr>
+		</xpath>
+	</template>
+
+	<template id="report_invoice_document_inherit" inherit_id="account.report_invoice_document">
+		<xpath expr="//table[@name='invoice_line_table']//thead//th[@name='th_taxes']" position="before">
+			<t t-set="total_tax_on_gst" t-value="o.get_total_gst()"/>
+			<th name="th_pf_gst_per" class="text-end" t-if="total_tax_on_gst != 0">
+				P&amp;F (%)
+			</th>
+			<th name="th_pf_gst_amount" class="text-end" t-if="total_tax_on_gst != 0">
+				P&amp;F Charges
+			</th>
+		</xpath>
+		<xpath expr="//table[@name='invoice_line_table']//tbody//td[@name='td_taxes']" position="before">
+			<td name="td_pf_gst_per" class="text-end" t-if="total_tax_on_gst != 0">
+				<span class="text-nowrap" t-field="line.pf_gst_per"/> %
+			</td>
+			<td name="td_pf_gst_amount" class="text-end" t-if="total_tax_on_gst != 0">
+				<span class="text-nowrap" t-field="line.pf_gst_amount"/>
+			</td>
+		</xpath>
+		<!-- <xpath expr="//t[@t-if='o.tax_totals']" position="replace">
+			<t t-if="o.tax_totals" t-call="account.document_tax_totals">
+				<t t-set="tax_totals" t-value="o.tax_totals"/>
+				<t t-set="currency" t-value="o.currency_id"/>
+				<t t-set="pf_name" t-value="'P&amp;F Charges'"/>
+				<t t-set="pf_amount" t-value="o.get_total_gst()"/>
+			</t>
+		</xpath> -->
+	</template>
+</odoo>

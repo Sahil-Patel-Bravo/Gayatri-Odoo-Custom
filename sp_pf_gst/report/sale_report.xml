@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+	<template id="sale_report_saleorder_document_inherit" inherit_id="sale.report_saleorder_document">
+		<xpath expr="//th[@name='th_taxes']" position="before">
+			<t t-set="total_tax_on_gst" t-value="doc.get_total_gst()"/>
+			<!-- <th name="th_pf_gst_per" class="text-end" t-if="total_tax_on_gst != 0">
+				P&amp;F (%)
+			</th> -->
+			<th name="th_pf_gst_amount" class="text-end" t-if="total_tax_on_gst != 0">
+				P&amp;F Charges
+			</th>
+		</xpath>
+		<xpath expr="//td[@name='td_product_taxes']" position="before">
+			<!-- <td name="td_pf_gst_per" class="text-end" t-if="total_tax_on_gst != 0">
+				<span class="text-nowrap" t-field="line.pf_gst_per"/> %
+			</td> -->
+			<td name="td_pf_gst_amount" class="text-end" t-if="total_tax_on_gst != 0">
+				<span class="text-nowrap" t-esc="round(line.pf_gst_amount, 2)" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+			</td>
+		</xpath>
+		<xpath expr="//table[hasclass('o_total_table')]" position="replace">
+			<table class="o_total_table table table-borderless">
+				<t t-call="sale.document_tax_totals">
+					<t t-set="tax_totals" t-value="doc.tax_totals"/>
+					<t t-set="currency" t-value="doc.currency_id"/>
+					<!-- <t t-set="pf_name" t-value="'P&amp;F Charges'"/> -->
+					<!-- <t t-set="pf_amount" t-value="doc.get_total_gst()"/> -->
+				</t>
+			</table>
+		</xpath>
+	</template>
+</odoo>

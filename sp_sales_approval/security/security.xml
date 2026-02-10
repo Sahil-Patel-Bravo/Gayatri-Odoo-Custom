@@ -1,0 +1,13 @@
+<odoo>
+	<data noupdate="0">
+
+		<record id="group_sales_approval" model="res.groups">
+			<field name="name">Sales Approval</field>
+		</record>
+
+		<record id="group_accounting_approval" model="res.groups">
+			<field name="name">Accounting Approval</field>
+		</record>
+
+	</data>
+</odoo>

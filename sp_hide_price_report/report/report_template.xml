@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+	<template id="sale_report_saleorder_document" inherit_id="sale.report_saleorder_document">
+		<xpath expr="//th[@name='th_priceunit']" position="after">
+			<th name="th_priceunit_act">
+				Unit Price
+			</th>
+		</xpath>
+		<xpath expr="//td[@name='td_product_priceunit']" position="after">
+			<td name="td_product_priceunit_act">
+				<!-- <t t-set="subtotal" t-value="line.price_subtotal / line.product_uom_qty"/> -->
+				<!-- <t t-set="subtotal" t-value="subtotal - line.pf_gst_amount"/> -->
+				<!-- <t t-esc="subtotal" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/> -->
+				<t t-set="subtotal" t-value="line.price_unit * (1 - (line.discount or 0.0) / 100.0)"/>
+				<t t-esc="subtotal" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+
+			</td>
+		</xpath>
+		<xpath expr="//th[@name='th_priceunit']" position="replace">
+		</xpath>
+		<xpath expr="//td[@name='td_product_priceunit']" position="replace">
+		</xpath>
+	</template>
+
+	<template id="account_report_invoice_document" inherit_id="account.report_invoice_document">
+		<xpath expr="//th[@name='th_priceunit']" position="after">
+			<th name="th_priceunit_act">
+				Unit Price
+			</th>
+		</xpath>
+		<xpath expr="//td[@name='td_price_unit']" position="after">
+			<td name="td_price_unit_act">
+				<t t-set="subtotal" t-value="line.price_unit * (1 - (line.discount or 0.0) / 100.0)"/>
+				<t t-esc="subtotal" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+
+				<!-- <t t-set="subtotal" t-value="line.price_subtotal / line.quantity"/> -->
+				<!-- <t t-set="subtotal" t-value="subtotal - line.pf_gst_amount"/> -->
+				<!-- <t t-esc="subtotal" t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/> -->
+			</td>			
+		</xpath>
+		<xpath expr="//th[@name='th_priceunit']" position="replace">
+		</xpath>
+		<xpath expr="//td[@name='td_price_unit']" position="replace">
+		</xpath>
+	</template>
+
+</odoo>

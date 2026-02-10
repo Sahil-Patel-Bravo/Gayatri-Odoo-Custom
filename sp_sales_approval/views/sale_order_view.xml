@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<data>
+	
+		<record id="sale_view_order_form_inherit" model="ir.ui.view">
+			<field name="name">sale.order.form.inherit</field>
+			<field name="model">sale.order</field>
+			<field name="inherit_id" ref="sale.view_order_form"/>
+			<field name="arch" type="xml">
+				<xpath expr="//sheet" position="before">
+					<div class="alert alert-danger" role="alert" invisible="approval_state in ('pending','approved','rejected') or not limit_warning_msg or state not in ('draft','sent')">
+						<div class="o_row">
+							<field name="limit_warning_msg" readonly="1" force_save="1"/>
+							<field name="approval_state" invisible="1"/>
+							<button name="action_create_request" type="object" string="Send" invisible="approval_state">
+								Send <i class="fa fa-arrow-circle-right"/>
+							</button>
+						</div>
+					</div>
+					<div class="alert alert-info" role="alert" invisible="approval_state != 'pending' or state not in ('draft','sent')">
+						<div class="o_row">
+							Sales Approval Requested Pending.
+						</div>
+					</div>
+					<div class="alert alert-info" role="alert" invisible="approval_state != 'approved' or state not in ('draft','sent')">
+						<div class="o_row">
+							Sales Approval Requested Approved.
+						</div>
+					</div>
+					<div class="alert alert-danger" role="alert" invisible="approval_state != 'rejected' or state not in ('draft','sent')">
+						<div class="o_row">
+							Sales Approval Requested Rejected.
+						</div>
+					</div>
+				</xpath>
+			</field>
+		</record>
+	
+	</data>
+</odoo>
