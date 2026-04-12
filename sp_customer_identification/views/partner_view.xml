@@ -11,5 +11,18 @@
 				</xpath>
 			</field>
 		</record>
+		<record id="view_res_partner_filter_inherit" model="ir.ui.view">
+			<field name="name">res.partner.search.inherit</field>
+			<field name="model">res.partner</field>
+			<field name="inherit_id" ref="base.view_res_partner_filter" />
+			<field name="arch" type="xml">
+				<xpath expr="//field[@name='name']" position="attributes">
+					<attribute name="filter_domain">['|', '|', '|', '|', '|', ('complete_name', 'ilike', self), ('ref', 'ilike', self), ('email', 'ilike', self), ('vat', 'ilike', self), ('company_registry', 'ilike', self), ('sequence_id', 'ilike', self)]</attribute>
+				</xpath>
+				<xpath expr="//field[@name='name']" position="after">
+					<field name="sequence_id" string="Customer ID" filter_domain="[('sequence_id', 'ilike', self)]"/>
+				</xpath>
+			</field>
+		</record>
 	</data>
 </odoo>

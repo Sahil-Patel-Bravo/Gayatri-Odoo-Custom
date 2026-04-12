@@ -8,7 +8,9 @@ class ResPartner(models.Model):
 
 	sequence_id = fields.Char(
 		string="Customer ID",
-		help="Unique sequence identifier for the customer."
+		help="Unique sequence identifier for the customer.",
+		store=True,
+		copy=False,
 	)
 
 	@api.model_create_multi

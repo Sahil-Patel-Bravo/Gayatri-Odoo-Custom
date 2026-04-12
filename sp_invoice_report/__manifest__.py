@@ -8,10 +8,11 @@
 	'description': """Invoice Report Enhancement""",
 	'category': 'Reports',
 	'website': 'https://sptechnologiessolution.com/',
-	'depends': ['base','sale','account','l10n_in'],
+	'depends': ['base','sale','account','l10n_in','date_range','account_reports'],
 	'data': [
 		'views/account_move_view.xml',
 		'views/sale_order_view.xml',
+		'views/partner_view.xml',
 		'report/report_template.xml',
 	],
 	'qweb': [],
