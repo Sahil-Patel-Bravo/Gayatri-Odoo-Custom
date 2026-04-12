@@ -15,7 +15,7 @@ class SaleOrder(models.Model):
 			sale_orders = self.env['sale.order'].search([('partner_id','=',rec.partner_id.id),('id','!=',rec.id),('state','!=','cancel')])
 			remain_sale_orders = sale_orders.filtered(lambda x:x.limit_warning_msg)
 			invoice_ids = remain_sale_orders.invoice_ids.filtered(lambda x:x.status_in_payment != "paid" and x.state != "cancel")
-			if invoice_ids:
+			if invoice_ids and not self.env.user.has_group('base.group_system'):
 				raise UserError(_("The credit limit for the previous Sale Order has already been increased, and the Invoice Payment is currently not Paid. Kindly prioritize paid it first \n Invoice Numbers : %s") % ','.join(invoice_ids.mapped("name")))
 
 	def action_confirm(self):
