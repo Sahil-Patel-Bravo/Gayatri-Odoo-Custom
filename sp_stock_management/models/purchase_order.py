@@ -71,7 +71,7 @@ class PurchaserderLine(models.Model):
 			if not location:
 				continue
 
-			rounding = line.product_uom.rounding
+			rounding = line.product_uom_id.rounding
 			# Prevent decreasing below received quantity			
 			if float_compare(line.product_qty, line.qty_received, precision_rounding=rounding) < 0:
 				raise UserError(_('You cannot decrease the ordered quantity below the received quantity.\n'

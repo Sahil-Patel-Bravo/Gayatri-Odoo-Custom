@@ -8,7 +8,7 @@
 	'description': """Invoice Report Enhancement""",
 	'category': 'Reports',
 	'website': 'https://sptechnologiessolution.com/',
-	'depends': ['base','sale','account','l10n_in','date_range','account_reports'],
+	'depends': ['base','sale','account','l10n_in','account_reports'],
 	'data': [
 		'views/account_move_view.xml',
 		'views/sale_order_view.xml',
