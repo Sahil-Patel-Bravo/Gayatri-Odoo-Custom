@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class ResPartner(models.Model):
@@ -12,6 +13,20 @@ class ResPartner(models.Model):
 		store=True,
 		copy=False,
 	)
+
+	@api.constrains('sequence_id')
+	def _check_unique_sequence_id(self):
+		for rec in self:
+			if not rec.sequence_id or rec.sequence_id == '/':
+				continue
+			duplicate = self.search([
+				('sequence_id', '=', rec.sequence_id),
+				('id', '!=', rec.id),
+			], limit=1)
+			if duplicate:
+				raise ValidationError(
+					_("The Customer ID '%s' already exists. Each partner must have a unique Customer ID.") % rec.sequence_id
+				)
 
 	@api.model_create_multi
 	def create(self, vals_list):

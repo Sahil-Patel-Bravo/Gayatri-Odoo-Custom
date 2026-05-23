@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Update GSTR-1 taxable base expressions to include gst_charge lines (P&F charges) -->
+<odoo noupdate="0">
+    <!-- Section 4A: B2B Regular -->
+    <record id="l10n_in_reports.account_report_gstr1_b2b_regular_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_b2b_regular'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 4B: B2B Reverse Charge -->
+    <record id="l10n_in_reports.account_report_gstr1_b2b_reverse_charge_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_b2b_rcm'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 5: B2CL -->
+    <record id="l10n_in_reports.account_report_gstr1_b2cl_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_b2cl'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 6: Export with payment -->
+    <record id="l10n_in_reports.account_report_gstr1_expwp_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_exp_wp'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 6: Export without payment -->
+    <record id="l10n_in_reports.account_report_gstr1_expwop_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_exp_wop'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 6: SEZ with payment -->
+    <record id="l10n_in_reports.account_report_gstr1_sezwp_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_sez_wp'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 6: SEZ without payment -->
+    <record id="l10n_in_reports.account_report_gstr1_sezwop_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_sez_wop'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 6: Deemed export -->
+    <record id="l10n_in_reports.account_report_gstr1_de_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_deemed_export'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 7: B2CS -->
+    <record id="l10n_in_reports.account_report_gstr1_b2cs_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_b2cs'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 9: CDNR B2B Regular -->
+    <record id="l10n_in_reports.account_report_gstr1_cdnr_b2b_regular_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_cdnr_regular'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 9: CDNR B2B Reverse Charge -->
+    <record id="l10n_in_reports.account_report_gstr1_cdnr_b2b_reverse_charge_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_cdnr_rcm'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 9: CDNR SEZ with payment -->
+    <record id="l10n_in_reports.account_report_gstr1_cdnr_sezwp_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_cdnr_sez_wp'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 9: CDNR SEZ without payment -->
+    <record id="l10n_in_reports.account_report_gstr1_cdnr_sezwop_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_cdnr_sez_wop'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 9: CDNR Deemed export -->
+    <record id="l10n_in_reports.account_report_gstr1_cdnr_de_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_cdnr_deemed_export'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 9: CDNUR B2CL -->
+    <record id="l10n_in_reports.account_report_gstr1_cdnur_b2cl_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_cdnur_b2cl'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 9: CDNUR Export with payment -->
+    <record id="l10n_in_reports.account_report_gstr1_cdnur_expwp_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_cdnur_exp_wp'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 9: CDNUR Export without payment -->
+    <record id="l10n_in_reports.account_report_gstr1_cdnur_expwop_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_cdnur_exp_wop'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 12: HSN B2B -->
+    <record id="l10n_in_reports.account_report_gstr1_hsn_b2b_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', 'in', ['sale_b2b_rcm', 'sale_b2b_regular', 'sale_sez_wp', 'sale_sez_wop', 'sale_deemed_export', 'sale_cdnr_rcm', 'sale_cdnr_regular', 'sale_cdnr_deemed_export', 'sale_cdnr_sez_wp', 'sale_cdnr_sez_wop', 'sale_nil_rated', 'sale_exempt', 'sale_non_gst_supplies']), ('move_id.l10n_in_gst_treatment', 'in', ['regular', 'composition', 'uin_holders', 'special_economic_zone', 'deemed_export']), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 12: HSN B2C -->
+    <record id="l10n_in_reports.account_report_gstr1_hsn_b2c_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', 'in', ['sale_b2cl', 'sale_b2cs', 'sale_exp_wp', 'sale_exp_wop', 'sale_cdnur_b2cl', 'sale_cdnur_exp_wp', 'sale_cdnur_exp_wop', 'sale_nil_rated', 'sale_exempt', 'sale_non_gst_supplies']), ('move_id.l10n_in_gst_treatment', 'in', ['unregistered', 'consumer', 'overseas']), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+    <!-- Section 14B: ECO 9(5) -->
+    <record id="l10n_in_reports.account_report_gstr1_eco_9_5_taxable_amount_balance" model="account.report.expression">
+        <field name="formula" eval="[('l10n_in_gstr_section', '=', 'sale_eco_9_5'), ('display_type', 'in', ['product', 'gst_charge'])]"/>
+    </record>
+</odoo>

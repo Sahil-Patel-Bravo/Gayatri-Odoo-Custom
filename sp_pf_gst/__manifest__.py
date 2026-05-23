@@ -8,7 +8,7 @@
 	'description': """SP P&F GST""",
 	'category': 'Sales Management',
 	'website': 'https://sptechnologiessolution.com/',
-	'depends': ['base','sale','purchase','account'],
+	'depends': ['base', 'sale', 'purchase', 'account', 'account_reports', 'l10n_in_reports'],
 	'data': [
 		'views/product_view.xml',
 		'views/sale_order_view.xml',
@@ -18,7 +18,10 @@
 		'report/invoice_report.xml',
 		'report/sale_report.xml',
 		'report/purchase_report.xml',
+
+		'data/gstr1_report_expressions.xml',
 	],
+	'post_init_hook': 'post_init_hook',
 	'qweb': [],
 	"license": 'LGPL-3',
 	'images': ['static/description/icon.png'],

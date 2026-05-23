@@ -43,6 +43,19 @@ class AccountMoveLine(models.Model):
             line.price_subtotal = line.currency_id.round(raw_subtotal + line.pf_gst_amount)
             line.price_total = base_line['tax_details']['raw_total_included_currency']
 
+    def _set_l10n_in_gstr_section(self, tax_tags_dict):
+        # First let the base method handle product/tax lines
+        super()._set_l10n_in_gstr_section(tax_tags_dict)
+        # Then copy the section from the invoice's product lines to gst_charge lines
+        for line in self.filtered(lambda l: l.display_type == 'gst_charge'):
+            product_section = line.move_id.line_ids.filtered(
+                lambda l: l.display_type == 'product'
+                and l.l10n_in_gstr_section
+                and l.l10n_in_gstr_section != 'sale_out_of_scope'
+            )[:1].l10n_in_gstr_section
+            if product_section:
+                line.l10n_in_gstr_section = product_section
+
     def create(self, vals):
         res = super().create(vals)
         if not self._context.get('one_time'):
