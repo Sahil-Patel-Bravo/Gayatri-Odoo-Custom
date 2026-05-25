@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from odoo import models, fields, api, _
+from odoo.tools import frozendict
 
 
 class AccountMoveLine(models.Model):
@@ -14,12 +15,24 @@ class AccountMoveLine(models.Model):
         selection_add=[('gst_charge', 'GST Charge')],
         ondelete={'gst_charge': 'cascade'}
     )
+    gst_charge_key = fields.Binary(
+        compute='_compute_gst_charge_key', exportable=False,
+    )
 
     @api.onchange('product_id')
     def onchange_product_pf_gst(self):
         if self.product_id:
             self.pf_gst_per = self.product_id.pf_gst
             self.is_hilti = self.product_id.is_hilti
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('product_id') and not vals.get('pf_gst_per'):
+                product = self.env['product.product'].browse(vals['product_id'])
+                vals['pf_gst_per'] = product.pf_gst
+                vals['is_hilti'] = product.is_hilti
+        return super().create(vals_list)
 
     @api.depends("pf_gst_per", "tax_ids", "price_unit", "quantity", "discount", "currency_id")
     def compute_on_pf(self):
@@ -43,46 +56,43 @@ class AccountMoveLine(models.Model):
             line.price_subtotal = line.currency_id.round(raw_subtotal + line.pf_gst_amount)
             line.price_total = base_line['tax_details']['raw_total_included_currency']
 
+    def _compute_gst_charge_key(self):
+        for line in self:
+            if line.display_type == 'gst_charge':
+                line.gst_charge_key = frozendict({
+                    'move_id': line.move_id.id,
+                    'account_id': line.account_id.id if line.account_id else 0,
+                })
+            else:
+                line.gst_charge_key = False
+
     def _set_l10n_in_gstr_section(self, tax_tags_dict):
-        # First let the base method handle product/tax lines
         super()._set_l10n_in_gstr_section(tax_tags_dict)
-        # Then copy the section from the invoice's product lines to gst_charge lines
         for line in self.filtered(lambda l: l.display_type == 'gst_charge'):
-            product_section = line.move_id.line_ids.filtered(
-                lambda l: l.display_type == 'product'
-                and l.l10n_in_gstr_section
-                and l.l10n_in_gstr_section != 'sale_out_of_scope'
-            )[:1].l10n_in_gstr_section
-            if product_section:
-                line.l10n_in_gstr_section = product_section
-
-    def create(self, vals):
-        res = super().create(vals)
-        if not self._context.get('one_time'):
-            res.move_id._add_gst_charge_line()
-        return res
-
-    def write(self, vals):
-        res = super().write(vals)
-        if not self._context.get('one_time'):
-            self.move_id._add_gst_charge_line()
-        return res
+            # Only set section on the P&F *base* line (name is 'P&F Charges' or 'GST Charges').
+            # P&F tax lines must NOT get a section — their amounts
+            # are injected via the Python override on account.report.
+            if line.name in ('P&F Charges', 'GST Charges'):
+                product_section = line.move_id.line_ids.filtered(
+                    lambda l: l.display_type == 'product'
+                    and l.l10n_in_gstr_section
+                    and l.l10n_in_gstr_section not in ('sale_out_of_scope', 'purchase_out_of_scope')
+                )[:1].l10n_in_gstr_section
+                if product_section:
+                    line.l10n_in_gstr_section = product_section
+            else:
+                line.l10n_in_gstr_section = False
 
 
 class AccountMove(models.Model):
     _inherit = 'account.move'
 
-    def create(self, vals):
-        res = super().create(vals)
-        if not self._context.get('one_time'):
-            res._add_gst_charge_line()
-        return res
-
-    def write(self, vals):
-        res = super().write(vals)
-        if not self._context.get('one_time'):
-            self._add_gst_charge_line()
-        return res
+    needed_gst_charge = fields.Binary(
+        compute='_compute_needed_gst_charge', exportable=False,
+    )
+    needed_gst_charge_dirty = fields.Boolean(
+        compute='_compute_needed_gst_charge',
+    )
 
     # -------------------------------------------------------------------------
     # Helpers
@@ -132,55 +142,170 @@ class AccountMove(models.Model):
                 line_amounts.append(line_tax_amount)
             return rec.currency_id.round(sum(line_amounts))
 
-    def _add_gst_charge_line(self):
-        for record in self:
-            if record.state == "draft" and record.move_type in (
-                "out_invoice", "in_invoice", "out_refund", "in_refund"
-            ):
-                invoice_line_ids = record.line_ids.filtered(
-                    lambda line: line.display_type == "gst_charge"
-                )
+    def _get_pf_tax_amounts_by_tag(self):
+        """Compute P&F tax amounts grouped by GST tag for all invoice lines."""
+        self.ensure_one()
+        gst_tag_refs = {
+            'igst': self.env.ref('l10n_in.tax_tag_igst', raise_if_not_found=False),
+            'cgst': self.env.ref('l10n_in.tax_tag_cgst', raise_if_not_found=False),
+            'sgst': self.env.ref('l10n_in.tax_tag_sgst', raise_if_not_found=False),
+            'cess': self.env.ref('l10n_in.tax_tag_cess', raise_if_not_found=False),
+        }
+        gst_tags = {k: v for k, v in gst_tag_refs.items() if v}
+        amounts_by_tag = {}
+        currency = self.currency_id
+        for line in self.invoice_line_ids:
+            if not line.pf_gst_amount:
+                continue
+            for tax in line.tax_ids:
+                children = tax.children_tax_ids if tax.amount_type == 'group' else tax
+                for child in children:
+                    pf_tax_amt = currency.round(line.pf_gst_amount * child.amount / 100)
+                    if not pf_tax_amt:
+                        continue
+                    tax_rep_tags = child.invoice_repartition_line_ids.filtered(
+                        lambda r: r.repartition_type == 'tax'
+                    ).tag_ids
+                    for tag_key, tag in gst_tags.items():
+                        if tag in tax_rep_tags:
+                            amounts_by_tag[tag] = currency.round(
+                                amounts_by_tag.get(tag, 0.0) + pf_tax_amt
+                            )
+        return amounts_by_tag
 
-                gst_total = record.currency_id.round(
-                    sum(record.invoice_line_ids.mapped('pf_gst_amount'))
-                )
-                gst_amount_line = record.currency_id.round(
-                    record.get_total_tax_on_gst()
-                )
-                total_amount = record.currency_id.round(gst_total + gst_amount_line)
+    # -------------------------------------------------------------------------
+    # GST-charge dynamic sync
+    # -------------------------------------------------------------------------
 
-                if record.move_type in ("out_invoice", "in_refund"):
-                    final_balance = -abs(total_amount)
-                else:
-                    final_balance = abs(total_amount)
+    @api.depends(
+        'invoice_line_ids.pf_gst_amount',
+        'invoice_line_ids.tax_ids',
+        'move_type',
+        'journal_id',
+    )
+    def _compute_needed_gst_charge(self):
+        for move in self:
+            move.needed_gst_charge = {}
+            move.needed_gst_charge_dirty = True
 
-                if invoice_line_ids:
-                    invoice_line_ids.with_context(one_time=True).write({
-                        'balance': final_balance,
-                        'amount_currency': final_balance,
-                    })
-                else:
-                    record.with_context(one_time=True).write({
-                        'line_ids': [(0, 0, {
-                            'name': 'GST Charges',
-                            'quantity': 1,
-                            'display_type': 'gst_charge',
-                            'price_unit': abs(total_amount),
-                            'balance': final_balance,
-                            'amount_currency': final_balance,
-                            'account_id': record.journal_id.default_account_id.id,
-                        })]
-                    })
+            if not move.is_invoice(True):
+                continue
 
-                # ---------------------------------------------------------------
-                # KEY FIX for "Amount Due missing":
-                # After writing the gst_charge line we must force Odoo to
-                # re-synchronise the payment-term (receivable/payable) line.
-                # Without this, the payment-term line balance stays at the
-                # pre-P&F value so Amount Due is always short by the P&F total.
-                # We use one_time=True to prevent our own write() from looping.
-                # ---------------------------------------------------------------
-                record.with_context(one_time=True)._synchronize_business_models({'line_ids'})
+            currency = move.currency_id or self.env.company.currency_id
+            gst_base = currency.round(
+                sum(move.invoice_line_ids.mapped('pf_gst_amount'))
+            )
+            if not gst_base:
+                continue
+
+            sign = -1 if move.move_type in ('out_invoice', 'in_refund') else 1
+            is_refund = move.move_type in ('out_refund', 'in_refund')
+
+            # --- P&F base line (goes to journal default / sales account) ---
+            base_account_id = (
+                move.journal_id.default_account_id.id
+                if move.journal_id.default_account_id
+                else False
+            )
+            base_balance = sign * abs(gst_base)
+            base_key = frozendict({
+                'move_id': move.id,
+                'account_id': base_account_id or 0,
+            })
+            move.needed_gst_charge[base_key] = {
+                'name': 'P&F Charges',
+                'balance': base_balance,
+                'amount_currency': base_balance,
+                'account_id': base_account_id,
+                'quantity': 1,
+                'price_unit': abs(gst_base),
+            }
+
+            # --- P&F tax lines (one per tax account) ---
+            tax_agg = {}  # {account_id: {'amount': float, 'name': str}}
+            rep_field = (
+                'refund_repartition_line_ids' if is_refund
+                else 'invoice_repartition_line_ids'
+            )
+            for line in move.invoice_line_ids:
+                if not line.pf_gst_amount:
+                    continue
+                for tax in line.tax_ids:
+                    children = (
+                        tax.children_tax_ids
+                        if tax.amount_type == 'group'
+                        else tax
+                    )
+                    for child in children:
+                        pf_tax_amt = currency.round(
+                            line.pf_gst_amount * child.amount / 100
+                        )
+                        if not pf_tax_amt:
+                            continue
+                        rep_lines = child[rep_field].filtered(
+                            lambda r: r.repartition_type == 'tax'
+                        )
+                        tax_acct = rep_lines.account_id
+                        acct_id = tax_acct.id if tax_acct else 0
+                        if acct_id in tax_agg:
+                            tax_agg[acct_id]['amount'] += pf_tax_amt
+                        else:
+                            tax_agg[acct_id] = {
+                                'amount': pf_tax_amt,
+                                'name': f'P&F {child.name}',
+                                'account_id': tax_acct.id if tax_acct else False,
+                            }
+
+            for acct_id, data in tax_agg.items():
+                tax_balance = sign * abs(data['amount'])
+                tax_key = frozendict({
+                    'move_id': move.id,
+                    'account_id': acct_id,
+                })
+                if tax_key in move.needed_gst_charge:
+                    # Collision with base account – merge (very rare)
+                    existing = move.needed_gst_charge[tax_key]
+                    existing['balance'] = currency.round(
+                        existing['balance'] + tax_balance
+                    )
+                    existing['amount_currency'] = existing['balance']
+                    existing['price_unit'] = abs(existing['balance'] / sign) if sign else 0
+                    continue
+
+                move.needed_gst_charge[tax_key] = {
+                    'name': data['name'],
+                    'balance': tax_balance,
+                    'amount_currency': tax_balance,
+                    'account_id': data['account_id'],
+                    'quantity': 1,
+                    'price_unit': abs(data['amount']),
+                }
+
+    def _get_sync_stack(self, container):
+        stack, update_containers = super()._get_sync_stack(container)
+
+        gst_container = {'records': self.env['account.move']}
+
+        orig_update = update_containers
+
+        def patched_update():
+            result = orig_update()
+            gst_container['records'] = container['records'].filtered(
+                lambda m: m.is_invoice(True)
+            )
+            return result
+
+        patched_update()
+
+        stack.append((8, self._sync_dynamic_line(
+            existing_key_fname='gst_charge_key',
+            needed_vals_fname='needed_gst_charge',
+            needed_dirty_fname='needed_gst_charge_dirty',
+            line_type='gst_charge',
+            container=gst_container,
+        )))
+
+        return stack, patched_update
 
     # -------------------------------------------------------------------------
     # _compute_amount
@@ -224,13 +349,9 @@ class AccountMove(models.Model):
                         total += line.balance
                         total_currency += line.amount_currency
                     elif line.display_type == 'payment_term':
-                        # payment_term line balance is set by Odoo to balance the
-                        # full journal entry (including gst_charge line) after
-                        # _synchronize_business_models runs — so amount_residual
-                        # here will already reflect the P&F amount correctly.
                         total_residual += line.amount_residual
                         total_residual_currency += line.amount_residual_currency
-                    # gst_charge lines excluded here; added via gst_amount below
+                    # gst_charge excluded – P&F amounts added manually below
                 else:
                     if line.debit:
                         total += line.balance
@@ -242,6 +363,7 @@ class AccountMove(models.Model):
                 sum(move.invoice_line_ids.mapped('pf_gst_amount'))
             )
             gst_amount_line = move.currency_id.round(move.get_total_tax_on_gst())
+            pf_total = move.currency_id.round(gst_amount + gst_amount_line)
 
             amount_untaxed = move.currency_id.round(sign * total_untaxed_currency)
             move.amount_untaxed = move.currency_id.round(amount_untaxed + gst_amount)
@@ -250,19 +372,28 @@ class AccountMove(models.Model):
             )
             amount_total = move.currency_id.round(sign * total_currency)
             move.amount_total = move.currency_id.round(
-                amount_total + gst_amount + gst_amount_line
+                amount_total + pf_total
             )
 
-            # amount_residual drives "Amount Due".
-            # After _synchronize_business_models the payment_term line balance
-            # already includes the gst_charge, so we read it directly.
-            move.amount_residual = move.currency_id.round(-sign * total_residual_currency)
+            move.amount_residual = move.currency_id.round(
+                -sign * total_residual_currency
+            )
 
-            move.amount_untaxed_signed = -total_untaxed
-            move.amount_untaxed_in_currency_signed = -total_untaxed_currency
-            move.amount_tax_signed = -total_tax
+            # The *_signed fields feed _compute_needed_terms which sets the
+            # payment-term line balance.  They MUST include P&F so that the
+            # payment-term amount balances the gst_charge line.
+            move.amount_untaxed_signed = move.currency_id.round(
+                -total_untaxed + gst_amount
+            )
+            move.amount_untaxed_in_currency_signed = move.currency_id.round(
+                -total_untaxed_currency + gst_amount
+            )
+            move.amount_tax_signed = move.currency_id.round(
+                -total_tax + gst_amount_line
+            )
             move.amount_total_signed = (
-                abs(total) if move.move_type == 'entry' else -total
+                abs(total) if move.move_type == 'entry'
+                else move.currency_id.round(-total + pf_total)
             )
             move.amount_residual_signed = total_residual
             move.amount_total_in_currency_signed = (
@@ -318,10 +449,9 @@ class AccountMove(models.Model):
                         line_gst_tax = move.currency_id.round(
                             move.get_total_tax_on_gst(tax_id=tax_group.get('id'))
                         )
-                        if move.move_type in ("out_invoice", "out_refund"):
-                            tax_group['tax_amount'] = move.currency_id.round(
-                                tax_group['tax_amount'] + line_gst_tax
-                            )
+                        tax_group['tax_amount'] = move.currency_id.round(
+                            tax_group['tax_amount'] + line_gst_tax
+                        )
                         tax_group['tax_amount_currency'] = move.currency_id.round(
                             tax_group['tax_amount_currency'] + line_gst_tax
                         )

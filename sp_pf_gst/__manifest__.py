@@ -21,7 +21,7 @@
 
 		'data/gstr1_report_expressions.xml',
 	],
-	'post_init_hook': 'post_init_hook',
+	# 'post_init_hook': 'post_init_hook',
 	'qweb': [],
 	"license": 'LGPL-3',
 	'images': ['static/description/icon.png'],
