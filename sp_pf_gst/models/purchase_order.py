@@ -12,8 +12,8 @@ class PurchaserderLine(models.Model):
 	@api.onchange('product_id')
 	def onchange_product_pf_gst(self):
 		if self.product_id:
-			self.pf_gst_per = self.product_id.pf_gst
 			self.is_hilti = self.product_id.is_hilti
+			self.pf_gst_per = self.product_id.pf_gst if self.product_id.is_hilti else 0
 			
 	@api.depends("pf_gst_per", "tax_ids", "price_unit", "product_qty", "discount")
 	def compute_on_pf(self):
@@ -39,8 +39,9 @@ class PurchaserderLine(models.Model):
 	def _prepare_account_move_line(self, move=False):
 		res = super()._prepare_account_move_line(move)
 		res.update({
-			"pf_gst_per": self.pf_gst_per,
-			"pf_gst_amount": self.order_id.currency_id.round(self.pf_gst_amount),
+			"is_hilti": self.is_hilti,
+			"pf_gst_per": self.pf_gst_per if self.is_hilti else 0,
+			"pf_gst_amount": self.order_id.currency_id.round(self.pf_gst_amount) if self.is_hilti else 0,
 		})
 		return res
 

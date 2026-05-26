@@ -12,8 +12,8 @@ class SaleOrderLine(models.Model):
 	@api.onchange('product_id')
 	def onchange_product_pf_gst(self):
 		if self.product_id:
-			self.pf_gst_per = self.product_id.pf_gst
 			self.is_hilti = self.product_id.is_hilti
+			self.pf_gst_per = self.product_id.pf_gst if self.product_id.is_hilti else 0
 			
 	@api.depends("pf_gst_per", "tax_ids", "price_unit", "product_uom_qty", "discount")
 	def compute_on_pf(self):
@@ -48,7 +48,10 @@ class SaleOrderLine(models.Model):
 
 	def _prepare_invoice_line(self, **optional_values):
 		res = super()._prepare_invoice_line(**optional_values)
-		res.update({"pf_gst_per": self.pf_gst_per})
+		res.update({
+			"is_hilti": self.is_hilti,
+			"pf_gst_per": self.pf_gst_per if self.is_hilti else 0,
+		})
 		return res
 
 class SaleOrder(models.Model):

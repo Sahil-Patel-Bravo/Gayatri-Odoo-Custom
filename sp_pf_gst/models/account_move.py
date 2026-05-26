@@ -22,16 +22,19 @@ class AccountMoveLine(models.Model):
     @api.onchange('product_id')
     def onchange_product_pf_gst(self):
         if self.product_id:
-            self.pf_gst_per = self.product_id.pf_gst
             self.is_hilti = self.product_id.is_hilti
+            self.pf_gst_per = self.product_id.pf_gst if self.product_id.is_hilti else 0
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if vals.get('product_id') and not vals.get('pf_gst_per'):
-                product = self.env['product.product'].browse(vals['product_id'])
-                vals['pf_gst_per'] = product.pf_gst
-                vals['is_hilti'] = product.is_hilti
+            if vals.get('product_id'):
+                if 'is_hilti' not in vals:
+                    product = self.env['product.product'].browse(vals['product_id'])
+                    vals['is_hilti'] = product.is_hilti
+                    vals['pf_gst_per'] = product.pf_gst if product.is_hilti else 0
+                elif not vals.get('is_hilti'):
+                    vals['pf_gst_per'] = 0
         return super().create(vals_list)
 
     @api.depends("pf_gst_per", "tax_ids", "price_unit", "quantity", "discount", "currency_id")
