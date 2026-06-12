@@ -20,6 +20,7 @@
 		'report/purchase_report.xml',
 
 		'data/gstr1_report_expressions.xml',
+		'data/migrate_pf_gst_action.xml',
 	],
 	# 'post_init_hook': 'post_init_hook',
 	'qweb': [],

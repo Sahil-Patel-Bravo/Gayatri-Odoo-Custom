@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
+from markupsafe import Markup
+
 from odoo import models, fields, api, _
+from odoo.fields import Command
 from odoo.tools import frozendict
 
 
@@ -470,3 +473,110 @@ class AccountMove(models.Model):
                 )
             else:
                 move.tax_totals = None
+
+    # -------------------------------------------------------------------------
+    # Server Action: Migrate old P&F lines
+    # -------------------------------------------------------------------------
+
+    def action_migrate_pf_gst_lines(self):
+        """Migrate old single 'GST Charges' line to new split structure.
+
+        Called from server action on selected invoices/bills.
+        Handles reconciled invoices by unreconciling → migrating → re-reconciling.
+        Logs all changes in the chatter via OdooBot.
+        """
+        moves_to_migrate = self.filtered(
+            lambda m: m.state == 'posted'
+            and m.is_invoice(True)
+            and m.line_ids.filtered(
+                lambda l: l.display_type == 'gst_charge'
+                and l.name == 'GST Charges'
+            )
+            and any(il.pf_gst_amount for il in m.invoice_line_ids)
+        )
+
+        if not moves_to_migrate:
+            return
+
+        for move in moves_to_migrate:
+            old_gc = move.line_ids.filtered(
+                lambda l: l.display_type == 'gst_charge'
+            )
+            old_info = ", ".join(
+                f"{l.name} ({l.account_id.code}: ₹{abs(l.balance):.2f})"
+                for l in old_gc
+            )
+
+            # Save reconciliation info
+            pay_lines = move.line_ids.filtered(
+                lambda l: l.display_type == 'payment_term'
+            )
+            reconcile_info = []
+            for pl in pay_lines:
+                for partial in pl.matched_debit_ids:
+                    reconcile_info.append({
+                        'pay_line': pl,
+                        'counterpart': partial.debit_move_id,
+                        'amount': partial.amount,
+                    })
+                for partial in pl.matched_credit_ids:
+                    reconcile_info.append({
+                        'pay_line': pl,
+                        'counterpart': partial.credit_move_id,
+                        'amount': partial.amount,
+                    })
+
+            # Unreconcile if needed
+            if reconcile_info:
+                pay_lines.remove_move_reconcile()
+
+            # Reset to draft
+            move.button_draft()
+
+            # Delete old gst_charge lines and trigger sync
+            cmds = [Command.delete(l.id) for l in old_gc]
+            first_line = move.invoice_line_ids[:1]
+            if first_line and first_line.pf_gst_per:
+                orig_pf = first_line.pf_gst_per
+                cmds.append(Command.update(
+                    first_line.id, {'pf_gst_per': orig_pf + 0.001},
+                ))
+                move.write({'line_ids': cmds})
+                move.write({'line_ids': [
+                    Command.update(first_line.id, {'pf_gst_per': orig_pf}),
+                ]})
+            else:
+                move.write({'line_ids': cmds})
+
+            # Re-post
+            move.action_post()
+
+            # Re-reconcile
+            if reconcile_info:
+                for info in reconcile_info:
+                    pay_line = move.line_ids.filtered(
+                        lambda l: l.display_type == 'payment_term'
+                        and l.account_id == info['pay_line'].account_id
+                    )[:1]
+                    if pay_line and info['counterpart'].exists():
+                        (pay_line + info['counterpart']).reconcile()
+
+            # Log in chatter
+            new_gc = move.line_ids.filtered(
+                lambda l: l.display_type == 'gst_charge'
+            )
+            new_info = ", ".join(
+                f"{l.name} ({l.account_id.code}: ₹{abs(l.balance):.2f})"
+                for l in new_gc
+            )
+
+            body = Markup(
+                "<strong>P&amp;F Charges Updated</strong><br/>"
+                "<strong>Old:</strong> %s<br/>"
+                "<strong>New:</strong> %s"
+            ) % (old_info, new_info)
+            move.message_post(
+                body=body,
+                message_type='notification',
+                subtype_xmlid='mail.mt_note',
+            )
