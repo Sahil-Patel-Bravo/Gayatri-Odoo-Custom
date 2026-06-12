@@ -647,8 +647,21 @@ class AccountMove(models.Model):
         if residual:
             specs[0]['balance'] = currency.round(specs[0]['balance'] + residual)
 
+        # Edit the journal-line records DIRECTLY (not via move.write({'line_ids'}))
+        # so we don't trip the "readonly fields on a posted move: line_ids" guard.
         old_list = list(old_gc)
-        cmds = []
+        template = old_list[0]
+        aml = self.env['account.move.line'].with_context(
+            skip_invoice_sync=True, check_move_validity=False,
+        )
+        common = {
+            'move_id': move.id,
+            'partner_id': template.partner_id.id,
+            'date': template.date,
+            'company_id': template.company_id.id,
+            'currency_id': currency.id,
+            'display_type': 'gst_charge',
+        }
         for i, spec in enumerate(specs):
             bal = spec['balance']
             vals = {
@@ -657,21 +670,20 @@ class AccountMove(models.Model):
                 'debit': bal if bal > 0 else 0.0,
                 'credit': -bal if bal < 0 else 0.0,
                 'amount_currency': bal,
-                'display_type': 'gst_charge',
                 'quantity': 1,
                 'price_unit': abs(bal),
                 'l10n_in_gstr_section': spec['section'],
             }
             if i < len(old_list):
-                cmds.append(Command.update(old_list[i].id, vals))
+                old_list[i].with_context(
+                    skip_invoice_sync=True, check_move_validity=False,
+                ).write(vals)
             else:
-                cmds.append(Command.create(dict(vals, currency_id=currency.id)))
+                aml.create({**common, **vals})
         for extra in old_list[len(specs):]:
-            cmds.append(Command.delete(extra.id))
-
-        move.with_context(
-            skip_invoice_sync=True, check_move_validity=False,
-        ).write({'line_ids': cmds})
+            extra.with_context(
+                skip_invoice_sync=True, check_move_validity=False,
+            ).unlink()
 
         # Log in chatter
         new_gc = move.line_ids.filtered(
