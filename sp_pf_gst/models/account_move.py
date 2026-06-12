@@ -699,7 +699,9 @@ class AccountMove(models.Model):
             "<strong>Old:</strong> %s<br/>"
             "<strong>New:</strong> %s"
         ) % (old_info, new_info)
-        move.message_post(
+        move.with_context(
+            skip_invoice_sync=True, check_move_validity=False,
+        ).message_post(
             body=body,
             message_type='notification',
             subtype_xmlid='mail.mt_note',
