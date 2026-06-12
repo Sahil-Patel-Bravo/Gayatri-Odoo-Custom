@@ -484,7 +484,11 @@ class AccountMove(models.Model):
         Called from server action on selected invoices/bills.
         Handles reconciled invoices by unreconciling → migrating → re-reconciling.
         Logs all changes in the chatter via OdooBot.
+        Uses savepoints so one failure doesn't block all others.
         """
+        import logging
+        _logger = logging.getLogger(__name__)
+
         moves_to_migrate = self.filtered(
             lambda m: m.state == 'posted'
             and m.is_invoice(True)
@@ -496,87 +500,132 @@ class AccountMove(models.Model):
         )
 
         if not moves_to_migrate:
-            return
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'P&F Migration',
+                    'message': 'No invoices/bills need migration.',
+                    'type': 'warning',
+                    'sticky': False,
+                },
+            }
+
+        migrated = []
+        failed = []
 
         for move in moves_to_migrate:
-            old_gc = move.line_ids.filtered(
-                lambda l: l.display_type == 'gst_charge'
+            sp = self.env.cr.savepoint()
+            try:
+                self._migrate_single_move(move)
+                sp.close()
+                migrated.append(move.name)
+            except Exception as e:
+                sp.rollback()
+                _logger.warning("Migration failed for %s: %s", move.name, e)
+                failed.append(f"{move.name}: {e}")
+                move.invalidate_recordset()
+
+        msg_parts = []
+        if migrated:
+            msg_parts.append(f"Migrated {len(migrated)} invoice(s).")
+        if failed:
+            msg_parts.append(
+                f"Failed {len(failed)}: " + ", ".join(failed[:10])
             )
-            old_info = ", ".join(
-                f"{l.name} ({l.account_id.code}: ₹{abs(l.balance):.2f})"
-                for l in old_gc
-            )
+            if len(failed) > 10:
+                msg_parts.append(f"... and {len(failed) - 10} more.")
 
-            # Save reconciliation info
-            pay_lines = move.line_ids.filtered(
-                lambda l: l.display_type == 'payment_term'
-            )
-            reconcile_info = []
-            for pl in pay_lines:
-                for partial in pl.matched_debit_ids:
-                    reconcile_info.append({
-                        'pay_line': pl,
-                        'counterpart': partial.debit_move_id,
-                        'amount': partial.amount,
-                    })
-                for partial in pl.matched_credit_ids:
-                    reconcile_info.append({
-                        'pay_line': pl,
-                        'counterpart': partial.credit_move_id,
-                        'amount': partial.amount,
-                    })
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'P&F Migration Complete',
+                'message': " ".join(msg_parts),
+                'type': 'success' if not failed else 'warning',
+                'sticky': True,
+            },
+        }
 
-            # Unreconcile if needed
-            if reconcile_info:
-                pay_lines.remove_move_reconcile()
+    def _migrate_single_move(self, move):
+        old_gc = move.line_ids.filtered(
+            lambda l: l.display_type == 'gst_charge'
+        )
+        old_info = ", ".join(
+            f"{l.name} ({l.account_id.code}: ₹{abs(l.balance):.2f})"
+            for l in old_gc
+        )
 
-            # Reset to draft
-            move.button_draft()
+        # Save reconciliation info
+        pay_lines = move.line_ids.filtered(
+            lambda l: l.display_type == 'payment_term'
+        )
+        reconcile_info = []
+        for pl in pay_lines:
+            for partial in pl.matched_debit_ids:
+                reconcile_info.append({
+                    'pay_line_account': pl.account_id,
+                    'counterpart': partial.debit_move_id,
+                    'amount': partial.amount,
+                })
+            for partial in pl.matched_credit_ids:
+                reconcile_info.append({
+                    'pay_line_account': pl.account_id,
+                    'counterpart': partial.credit_move_id,
+                    'amount': partial.amount,
+                })
 
-            # Delete old gst_charge lines and trigger sync
-            cmds = [Command.delete(l.id) for l in old_gc]
-            first_line = move.invoice_line_ids[:1]
-            if first_line and first_line.pf_gst_per:
-                orig_pf = first_line.pf_gst_per
-                cmds.append(Command.update(
-                    first_line.id, {'pf_gst_per': orig_pf + 0.001},
-                ))
-                move.write({'line_ids': cmds})
-                move.write({'line_ids': [
-                    Command.update(first_line.id, {'pf_gst_per': orig_pf}),
-                ]})
-            else:
-                move.write({'line_ids': cmds})
+        # Unreconcile if needed
+        if reconcile_info:
+            pay_lines.remove_move_reconcile()
 
-            # Re-post
-            move.action_post()
+        # Reset to draft
+        move.button_draft()
 
-            # Re-reconcile
-            if reconcile_info:
-                for info in reconcile_info:
-                    pay_line = move.line_ids.filtered(
-                        lambda l: l.display_type == 'payment_term'
-                        and l.account_id == info['pay_line'].account_id
-                    )[:1]
-                    if pay_line and info['counterpart'].exists():
-                        (pay_line + info['counterpart']).reconcile()
+        # Delete old gst_charge lines and trigger sync
+        cmds = [Command.delete(l.id) for l in old_gc]
+        first_line = move.invoice_line_ids[:1]
+        if first_line and first_line.pf_gst_per:
+            orig_pf = first_line.pf_gst_per
+            cmds.append(Command.update(
+                first_line.id, {'pf_gst_per': orig_pf + 0.001},
+            ))
+            move.write({'line_ids': cmds})
+            move.write({'line_ids': [
+                Command.update(first_line.id, {'pf_gst_per': orig_pf}),
+            ]})
+        else:
+            move.write({'line_ids': cmds})
 
-            # Log in chatter
-            new_gc = move.line_ids.filtered(
-                lambda l: l.display_type == 'gst_charge'
-            )
-            new_info = ", ".join(
-                f"{l.name} ({l.account_id.code}: ₹{abs(l.balance):.2f})"
-                for l in new_gc
-            )
+        # Re-post
+        move.action_post()
 
-            body = Markup(
-                "<strong>P&amp;F Charges Updated</strong><br/>"
-                "<strong>Old:</strong> %s<br/>"
-                "<strong>New:</strong> %s"
-            ) % (old_info, new_info)
-            move.message_post(
-                body=body,
-                message_type='notification',
-                subtype_xmlid='mail.mt_note',
-            )
+        # Re-reconcile
+        if reconcile_info:
+            for info in reconcile_info:
+                pay_line = move.line_ids.filtered(
+                    lambda l: l.display_type == 'payment_term'
+                    and l.account_id == info['pay_line_account']
+                )[:1]
+                if pay_line and info['counterpart'].exists():
+                    (pay_line + info['counterpart']).reconcile()
+
+        # Log in chatter
+        new_gc = move.line_ids.filtered(
+            lambda l: l.display_type == 'gst_charge'
+        )
+        new_info = ", ".join(
+            f"{l.name} ({l.account_id.code}: ₹{abs(l.balance):.2f})"
+            for l in new_gc
+        )
+
+        body = Markup(
+            "<strong>P&amp;F Charges Updated</strong><br/>"
+            "<strong>Old:</strong> %s<br/>"
+            "<strong>New:</strong> %s"
+        ) % (old_info, new_info)
+        move.message_post(
+            body=body,
+            message_type='notification',
+            subtype_xmlid='mail.mt_note',
+        )
