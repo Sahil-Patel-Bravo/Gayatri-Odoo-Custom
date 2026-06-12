@@ -548,67 +548,130 @@ class AccountMove(models.Model):
         }
 
     def _migrate_single_move(self, move):
+        """Split the old combined 'GST Charges' line into base + tax lines
+        IN PLACE on the posted move.
+
+        We never reset to draft or repost.  The split lines are forced to sum
+        to the *exact* balance of the original combined line, so the entry
+        stays balanced and the cash-rounding / payment / reconciliation lines
+        are never recomputed or disturbed.  Writing with ``skip_invoice_sync``
+        prevents the dynamic-line sync (and cash-rounding recompute) from
+        firing; ``check_move_validity=False`` permits editing posted lines.
+        """
         old_gc = move.line_ids.filtered(
             lambda l: l.display_type == 'gst_charge'
         )
+        if not old_gc:
+            return
         old_info = ", ".join(
             f"{l.name} ({l.account_id.code}: ₹{abs(l.balance):.2f})"
             for l in old_gc
         )
 
-        # Save reconciliation info
-        pay_lines = move.line_ids.filtered(
-            lambda l: l.display_type == 'payment_term'
+        currency = move.currency_id or self.env.company.currency_id
+        sign = -1 if move.move_type in ('out_invoice', 'in_refund') else 1
+        is_refund = move.move_type in ('out_refund', 'in_refund')
+        rep_field = (
+            'refund_repartition_line_ids' if is_refund
+            else 'invoice_repartition_line_ids'
         )
-        reconcile_info = []
-        for pl in pay_lines:
-            for partial in pl.matched_debit_ids:
-                reconcile_info.append({
-                    'pay_line_account': pl.account_id,
-                    'counterpart': partial.debit_move_id,
-                    'amount': partial.amount,
-                })
-            for partial in pl.matched_credit_ids:
-                reconcile_info.append({
-                    'pay_line_account': pl.account_id,
-                    'counterpart': partial.credit_move_id,
-                    'amount': partial.amount,
-                })
 
-        # Unreconcile if needed
-        if reconcile_info:
-            pay_lines.remove_move_reconcile()
+        # Exact total of the existing balanced combined line(s).
+        target_balance = sum(old_gc.mapped('balance'))
 
-        # Reset to draft
-        move.button_draft()
+        gst_base = currency.round(
+            sum(move.invoice_line_ids.mapped('pf_gst_amount'))
+        )
+        base_account_id = (
+            move.journal_id.default_account_id.id or old_gc[0].account_id.id
+        )
 
-        # Delete old gst_charge lines and trigger sync
-        cmds = [Command.delete(l.id) for l in old_gc]
-        first_line = move.invoice_line_ids[:1]
-        if first_line and first_line.pf_gst_per:
-            orig_pf = first_line.pf_gst_per
-            cmds.append(Command.update(
-                first_line.id, {'pf_gst_per': orig_pf + 0.001},
-            ))
-            move.write({'line_ids': cmds})
-            move.write({'line_ids': [
-                Command.update(first_line.id, {'pf_gst_per': orig_pf}),
-            ]})
-        else:
-            move.write({'line_ids': cmds})
+        # GSTR section to carry on the base P&F line.
+        prod_section = move.line_ids.filtered(
+            lambda l: l.display_type == 'product'
+            and l.l10n_in_gstr_section
+            and l.l10n_in_gstr_section not in (
+                'sale_out_of_scope', 'purchase_out_of_scope'
+            )
+        )[:1].l10n_in_gstr_section
 
-        # Re-post
-        move.action_post()
+        # Aggregate P&F tax by tax account.
+        tax_agg = {}
+        for line in move.invoice_line_ids:
+            if not line.pf_gst_amount:
+                continue
+            for tax in line.tax_ids:
+                children = (
+                    tax.children_tax_ids
+                    if tax.amount_type == 'group' else tax
+                )
+                for child in children:
+                    pf_tax_amt = currency.round(
+                        line.pf_gst_amount * child.amount / 100
+                    )
+                    if not pf_tax_amt:
+                        continue
+                    rep_lines = child[rep_field].filtered(
+                        lambda r: r.repartition_type == 'tax'
+                    )
+                    tax_acct = rep_lines.account_id
+                    acct_id = tax_acct.id if tax_acct else base_account_id
+                    if acct_id in tax_agg:
+                        tax_agg[acct_id]['amount'] += pf_tax_amt
+                    else:
+                        tax_agg[acct_id] = {
+                            'amount': pf_tax_amt,
+                            'name': f'P&F {child.name}',
+                        }
 
-        # Re-reconcile
-        if reconcile_info:
-            for info in reconcile_info:
-                pay_line = move.line_ids.filtered(
-                    lambda l: l.display_type == 'payment_term'
-                    and l.account_id == info['pay_line_account']
-                )[:1]
-                if pay_line and info['counterpart'].exists():
-                    (pay_line + info['counterpart']).reconcile()
+        # Build the split: base line first (reuses old_gc[0]), then tax lines.
+        specs = [{
+            'account_id': base_account_id,
+            'name': 'P&F Charges',
+            'balance': sign * abs(gst_base),
+            'section': prod_section,
+        }]
+        for acct_id, data in tax_agg.items():
+            specs.append({
+                'account_id': acct_id,
+                'name': data['name'],
+                'balance': sign * abs(data['amount']),
+                'section': False,
+            })
+
+        # Force the split to sum EXACTLY to the original balanced total so the
+        # move never goes out of balance (absorb any paise residual into base).
+        residual = currency.round(
+            target_balance - sum(s['balance'] for s in specs)
+        )
+        if residual:
+            specs[0]['balance'] = currency.round(specs[0]['balance'] + residual)
+
+        old_list = list(old_gc)
+        cmds = []
+        for i, spec in enumerate(specs):
+            bal = spec['balance']
+            vals = {
+                'name': spec['name'],
+                'account_id': spec['account_id'],
+                'debit': bal if bal > 0 else 0.0,
+                'credit': -bal if bal < 0 else 0.0,
+                'amount_currency': bal,
+                'display_type': 'gst_charge',
+                'quantity': 1,
+                'price_unit': abs(bal),
+                'l10n_in_gstr_section': spec['section'],
+            }
+            if i < len(old_list):
+                cmds.append(Command.update(old_list[i].id, vals))
+            else:
+                cmds.append(Command.create(dict(vals, currency_id=currency.id)))
+        for extra in old_list[len(specs):]:
+            cmds.append(Command.delete(extra.id))
+
+        move.with_context(
+            skip_invoice_sync=True, check_move_validity=False,
+        ).write({'line_ids': cmds})
 
         # Log in chatter
         new_gc = move.line_ids.filtered(
