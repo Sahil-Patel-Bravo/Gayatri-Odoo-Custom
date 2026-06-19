@@ -29,11 +29,19 @@ class AccountReturn(models.Model):
                 if not pf_amount:
                     continue
                 currency = move.currency_id
-                vals['base_amount'] = currency.round(vals['base_amount'] + pf_amount)
+                # base_amount / igst / cgst / sgst follow the *balance* sign
+                # convention here (negative for sales credits); the JSON layer
+                # flips them with ``* -1``.  pf_gst_amount is always positive,
+                # so add it with the same sign as the base or it gets
+                # subtracted from the taxable value.
+                sign = -1 if base_line.balance < 0 else 1
+                vals['base_amount'] = currency.round(
+                    vals['base_amount'] + sign * pf_amount
+                )
                 for tax in base_line.tax_ids:
                     children = tax.children_tax_ids if tax.amount_type == 'group' else tax
                     for child in children:
-                        pf_tax_amt = currency.round(pf_amount * child.amount / 100)
+                        pf_tax_amt = sign * currency.round(pf_amount * child.amount / 100)
                         tax_rep_tags = child.invoice_repartition_line_ids.filtered(
                             lambda r: r.repartition_type == 'tax'
                         ).tag_ids
@@ -78,6 +86,7 @@ class AccountReport(models.Model):
 
             sections = None
             is_base = False
+            includes_gst_charge = False
             tag_id = None
 
             for term in domain:
@@ -88,11 +97,15 @@ class AccountReport(models.Model):
                     sections = [value]
                 elif field == 'l10n_in_gstr_section' and op == 'in':
                     sections = list(value)
-                elif field == 'display_type' and (
-                    (op == '=' and value == 'product')
-                    or (op == 'in' and 'product' in value)
-                ):
-                    is_base = True
+                elif field == 'display_type':
+                    if (op == '=' and value == 'product') or (
+                        op == 'in' and 'product' in value
+                    ):
+                        is_base = True
+                    if (op == '=' and value == 'gst_charge') or (
+                        op == 'in' and 'gst_charge' in value
+                    ):
+                        includes_gst_charge = True
                 elif field == 'tax_tag_ids':
                     tag_id = value if op == '=' else (
                         value[0] if op == 'in' and value else None
@@ -109,12 +122,17 @@ class AccountReport(models.Model):
                     )
                 pf_base, pf_tax_by_tag, gst_charge_bal = pf_cache[section]
                 if is_base:
-                    # The domain may include gst_charge lines.  Depending on
-                    # invoice structure (old combined line vs new split lines)
-                    # the gst_charge balance may contain P&F tax.  Subtract
-                    # any excess so only P&F base remains in the total.
-                    excess = gst_charge_bal - pf_base
-                    pf_addition -= excess
+                    # The base column must include the P&F *base* amount.
+                    # If the report formula was patched to also select
+                    # gst_charge lines, the domain already counted
+                    # ``gst_charge_bal`` (which may include P&F tax for old
+                    # combined lines), so we add only the difference.  If the
+                    # formula was NOT patched, the domain counted nothing for
+                    # P&F, so we add the full P&F base.
+                    if includes_gst_charge:
+                        pf_addition += pf_base - gst_charge_bal
+                    else:
+                        pf_addition += pf_base
                 elif tag_id in pf_tax_by_tag:
                     # P&F tax lines don't have a GSTR section, so they are
                     # not captured by the tax domain – add them here.

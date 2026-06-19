@@ -2,7 +2,7 @@
 
 {
 	'name': 'SP P&F GST',
-	'version': '1.0',
+	'version': '1.1',
 	'author': 'SP Technologies Solution',
 	'summary': 'SP P&F GST',
 	'description': """SP P&F GST""",
@@ -22,7 +22,7 @@
 		'data/gstr1_report_expressions.xml',
 		'data/migrate_pf_gst_action.xml',
 	],
-	# 'post_init_hook': 'post_init_hook',
+	'post_init_hook': 'post_init_hook',
 	'qweb': [],
 	"license": 'LGPL-3',
 	'images': ['static/description/icon.png'],

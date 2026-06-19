@@ -515,13 +515,14 @@ class AccountMove(models.Model):
         failed = []
 
         for move in moves_to_migrate:
-            sp = self.env.cr.savepoint()
+            # NOTE: Savepoint.close() defaults to rollback=True in Odoo 19, so
+            # use the context-manager form which releases on success and rolls
+            # back only on exception — one failure can't break the others.
             try:
-                self._migrate_single_move(move)
-                sp.close()
+                with self.env.cr.savepoint():
+                    self._migrate_single_move(move)
                 migrated.append(move.name)
             except Exception as e:
-                sp.rollback()
                 _logger.warning("Migration failed for %s: %s", move.name, e)
                 failed.append(f"{move.name}: {e}")
                 move.invalidate_recordset()
