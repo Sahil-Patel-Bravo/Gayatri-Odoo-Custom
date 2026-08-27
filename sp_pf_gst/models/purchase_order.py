@@ -5,16 +5,16 @@ from odoo import models, fields, api, _
 class PurchaserderLine(models.Model):
 	_inherit = 'purchase.order.line'
 
-	pf_gst_per = fields.Float("P&F Percentage")
+	pf_gst_per = fields.Float("P&F Percentage", compute="_compute_pf_gst", store=True, readonly=False)
 	pf_gst_amount = fields.Float("P&F Amount",compute="compute_on_pf")
-	is_hilti = fields.Boolean()
+	is_hilti = fields.Boolean(compute="_compute_pf_gst", store=True, readonly=False)
 
-	@api.onchange('product_id')
-	def onchange_product_pf_gst(self):
-		if self.product_id:
-			self.is_hilti = self.product_id.is_hilti
-			self.pf_gst_per = self.product_id.pf_gst if self.product_id.is_hilti else 0
-			
+	@api.depends('product_id')
+	def _compute_pf_gst(self):
+		for rec in self:
+			rec.is_hilti = rec.product_id.is_hilti
+			rec.pf_gst_per = rec.product_id.pf_gst if rec.product_id.is_hilti else 0
+
 	@api.depends("pf_gst_per", "tax_ids", "price_unit", "product_qty", "discount")
 	def compute_on_pf(self):
 		for rec in self:
