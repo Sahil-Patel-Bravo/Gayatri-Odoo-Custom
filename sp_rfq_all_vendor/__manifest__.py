@@ -8,8 +8,10 @@
 	'description': """SP RFQ Generate For All Vendor""",
 	'category': 'Sales/Purchase',
 	'website': 'https://sptechnologiessolution.com/',
-	'depends': ['base','sale','purchase','stock'],
-	'data': [],
+	'depends': ['base','sale','purchase','stock','purchase_stock'],
+	'data': [
+		'views/product_supplierinfo_views.xml',
+	],
 	'qweb': [],
 	"license": 'LGPL-3',
 	'images': ['static/description/icon.png'],

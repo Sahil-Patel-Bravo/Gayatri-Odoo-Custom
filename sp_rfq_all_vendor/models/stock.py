@@ -24,8 +24,12 @@ class MultiVendorStockRule(models.Model):
 					lambda s: not s.company_id or s.company_id == procurement.company_id
 				)
 
+			# Only vendors explicitly marked "Active for RFQ" take part in the
+			# automatic (min/max) RFQ generation.
+			suppliers = suppliers.filtered(lambda s: s.active_for_rfq)
+
 			if not suppliers:
-				msg = _('There is no matching vendor price to generate the purchase order for product %s (no vendor defined, minimum quantity not reached, dates not valid, ...). Go on the product form and complete the list of vendors.', procurement.product_id.display_name)
+				msg = _('There is no vendor marked "Active for RFQ" to generate the purchase order for product %s. Go on the product form (Purchase tab) and tick "Active for RFQ" on at least one vendor.', procurement.product_id.display_name)
 				errors.append((procurement, msg))
 				continue
 
